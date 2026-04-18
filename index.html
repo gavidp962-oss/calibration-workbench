@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>VECTOR_CALIBRATION_OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#b0c6ff",
+                        "on-primary": "#002d6f",
+                        "surface": "#131313",
+                        "on-surface": "#e5e2e1",
+                        "outline-variant": "#44474c",
+                        "secondary-container": "#13ff43",
+                        "on-secondary-container": "#002203"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .material-symbols-outlined { font-size: 20px; }
+        .grid-bg { background-image: radial-gradient(circle at 1px 1px, rgba(68, 71, 76, 0.15) 1px, transparent 0); background-size: 24px 24px; }
+        .scanline { background: linear-gradient(to bottom, transparent 50%, rgba(176, 198, 255, 0.02) 50%); background-size: 100% 4px; }
+        .fft-bar { transition: height 0.2s ease; }
+    </style>
+</head>
+<body class="bg-[#131313] text-on-surface font-body selection:bg-primary selection:text-on-primary">
+
+<input type="file" id="note-upload" class="hidden" accept="image/*" />
+
+<header class="flex justify-between items-center w-full px-6 py-3 bg-[#0e0e0e] fixed top-0 z-50 border-b border-outline-variant/20">
+    <div class="text-xl font-bold tracking-widest text-primary uppercase font-headline">VECTOR_CALIBRATION_OS</div>
+    <div class="flex items-center gap-4 text-[10px] font-mono">
+        <span id="system-status" class="text-primary/60">STATUS: STANDBY</span>
+        <div class="w-8 h-8 bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-primary">terminal</span>
+        </div>
+    </div>
+</header>
+
+<main class="pt-16 grid-bg min-h-screen">
+    <div class="p-8 max-w-[1600px] mx-auto">
+        <div class="flex justify-between items-end mb-8 border-l-4 border-primary pl-4">
+            <div>
+                <h1 class="text-4xl font-headline font-bold uppercase tracking-tighter">CALIBRATION_WORKBENCH</h1>
+                <p class="text-primary/50 font-mono text-xs mt-1">KERNEL: 2.4.0_STITCH | NODE: 0x88F2</p>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="document.getElementById('note-upload').click()" class="px-6 py-2 border border-primary/30 text-primary font-headline font-bold uppercase text-xs hover:bg-primary/10">UPLOAD_SCAN</button>
+                <button id="run-btn" class="px-6 py-2 bg-primary text-on-primary font-headline font-bold uppercase text-xs">RE-RUN_PIPELINE</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-6">
+            <div class="col-span-12 lg:col-span-8 bg-[#1c1b1b] p-6 border border-outline-variant/20">
+                <h2 class="text-xs font-headline font-bold tracking-widest uppercase mb-4 text-primary">FFT_SIGNAL_ANALYSIS</h2>
+                <div class="h-48 flex items-end justify-between gap-1 px-4 bg-black/40 rounded border border-white/5" id="fft-container"></div>
+            </div>
+
+            <div class="col-span-12 lg:col-span-4 bg-[#1c1b1b] p-6 border border-primary/20">
+                <h2 class="text-xs font-headline font-bold tracking-widest uppercase mb-6 text-primary">REAL_TIME_TELEMETRY</h2>
+                <div class="space-y-6 font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-[10px] opacity-60 uppercase">SNR_Ratio</span>
+                        <span class="text-primary" id="snr-val">-- dB</span>
+                    </div>
+                    <div>
+                        <label class="text-[10px] opacity-60 block mb-2 uppercase">Curve_Smoothing</label>
+                        <input type="range" id="smooth-slider" class="w-full accent-primary bg-surface-container-high h-1 appearance-none" />
+                    </div>
+                    <div id="log-box" class="p-3 bg-primary/5 border-l-2 border-primary text-[10px] text-primary/80 h-24 overflow-y-auto">
+                        SYSTEM_IDLE: Awaiting signal acquisition...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // 1. FFT UI Logic
+    const fftContainer = document.getElementById('fft-container');
+    const bars = [];
+    for (let i = 0; i < 50; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'fft-bar w-full bg-primary/20';
+        bar.style.height = '10%';
+        fftContainer.appendChild(bar);
+        bars.push(bar);
+    }
+
+    function animateFFT(active = false) {
+        bars.forEach(bar => {
+            const height = active ? Math.random() * 80 + 20 : Math.random() * 10 + 5;
+            bar.style.height = height + '%';
+        });
+    }
+    setInterval(() => animateFFT(window.isProcessing), 150);
+
+    // 2. Backend Bridge Logic
+    const runBtn = document.getElementById('run-btn');
+    const noteUpload = document.getElementById('note-upload');
+    const statusText = document.getElementById('system-status');
+    const logBox = document.getElementById('log-box');
+
+    runBtn.addEventListener('click', async () => {
+        const file = noteUpload.files[0];
+        if (!file) {
+            alert("ERROR: No input signal detected. Please upload a scan first.");
+            return;
+        }
+
+        window.isProcessing = true;
+        statusText.innerText = "STATUS: PROCESSING_FFT_NOTCH_FILTER...";
+        logBox.innerHTML += "<br>> Initializing FFT frequency mask...";
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // Replace with your actual Render/Stitch URL
+            const response = await fetch('YOUR_BACKEND_URL/calibrate', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            document.getElementById('snr-val').innerText = data.snr_ratio;
+            statusText.innerText = "STATUS: CALIBRATION_COMPLETE";
+            logBox.innerHTML += `<br>> Success: ${data.nodes_processed} nodes identified.`;
+        } catch (e) {
+            statusText.innerText = "STATUS: KERNEL_PANIC";
+            logBox.innerHTML += "<br>> Error: Backend connection failed.";
+        } finally {
+            window.isProcessing = false;
+        }
+    });
+</script>
+</body>
+</html>
